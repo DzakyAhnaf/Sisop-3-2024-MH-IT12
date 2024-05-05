@@ -19,17 +19,20 @@ int string_to_number(char *str) {
     if (strcmp(str, "tujuh") == 0) return 7;
     if (strcmp(str, "delapan") == 0) return 8;
     if (strcmp(str, "sembilan") == 0) return 9;
-    if (strcmp(str, "sepuluh") == 0) return 10; // Added support for "sepuluh"
+    if (strcmp(str, "sepuluh") == 0) return 10;
+    if (strcmp(str, "seratus") == 0) return 100;
     return -1; // If not a valid number string
 }
 
 // convert number to words
 void number_to_words(int num, char *result) {
-    char *ones[] = {"nol", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh"}; // Added "sepuluh"
+    char *ones[] = {"nol", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh"};
     char *teens[] = {"sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas", "enam belas", "tujuh belas", "delapan belas", "sembilan belas"};
     char *tens[] = {"", "sepuluh", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"};
 
-    if (num >= 0 && num <= 10) { 
+    if (num == 100) {
+        strcpy(result, "seratus");
+    } else if (num >= 0 && num <= 10) {
         strcpy(result, ones[num]);
     } else if (num >= 11 && num <= 19) {
         strcpy(result, teens[num - 10]);
@@ -170,7 +173,7 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[1], "-kurang") == 0) result = num1 - num2;
     else if (strcmp(argv[1], "-bagi") == 0) {
         if (num2 == 0) {
-            result = -1; 
+            result = -1; // Flag for division by zero
         } else {
             result = floor(num1 / num2);
         }
