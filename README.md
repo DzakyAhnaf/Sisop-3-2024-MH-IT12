@@ -489,7 +489,12 @@ return 0;
   ```
   
 ### Dokumentasi
- ![WhatsApp Image 2024-05-05 at 13 24 14_971fe5b8](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/151147728/2822541b-2de1-446d-8219-a4bcaf533aa1)
+- Hasil ouput di terminal
+  ![WhatsApp Image 2024-05-11 at 23 47 15_e470ac58](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/151147728/4002d411-b296-48c9-84f9-bf6212e8a33f)
+
+- Histori.log
+![WhatsApp Image 2024-05-11 at 23 47 15_83d2a51a](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/151147728/43a3ea49-f2b8-4d22-980d-3bdf2bb4ab55)
+
 
 
 
