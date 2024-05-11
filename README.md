@@ -20,6 +20,478 @@ Dikerjakan oleh Adlya Isriena Aftarisya (5027231066)
 
 Dikerjakan oleh Nisrina Atiqah Dwiputri Ridzki (5027231075)
 
+### Deskripsi Soal
+Max Verstappen 🏎️ seorang pembalap F1 dan programer memiliki seorang adik bernama Min Verstappen (masih SD) sedang menghadapi tahap paling kelam dalam kehidupan yaitu perkalian matematika, Min meminta bantuan Max untuk membuat kalkulator perkalian sederhana (satu sampai sembilan). Sembari Max nguli dia menyuruh Min untuk belajar perkalian dari web (referensi) agar tidak bergantung pada kalkulator.
+(Wajib menerapkan konsep pipes dan fork seperti yang dijelaskan di modul Sisop. Gunakan 2 pipes dengan diagram seperti di modul 3).
+
+a. Sesuai request dari adiknya Max ingin nama programnya dudududu.c. Sebelum program parent process dan child process, ada input dari user berupa 2 string. Contoh input: tiga tujuh. 
+
+b. Pada parent process, program akan mengubah input menjadi angka dan melakukan perkalian dari angka yang telah diubah. Contoh: tiga tujuh menjadi 21. 
+
+c. Pada child process, program akan mengubah hasil angka yang telah diperoleh dari parent process menjadi kalimat. Contoh: `21` menjadi “dua puluh satu”.
+
+d. Max ingin membuat program kalkulator dapat melakukan penjumlahan, pengurangan, dan pembagian, maka pada program buatlah argumen untuk menjalankan program : 
+  - perkalian	: ./kalkulator -kali
+  - penjumlahan	: ./kalkulator -tambah
+  - pengurangan	: ./kalkulator -kurang
+  - pembagian	: ./kalkulator -bagi
+  Beberapa hari kemudian karena Max terpaksa keluar dari Australian Grand Prix 2024 membuat Max tidak bersemangat untuk melanjutkan programnya sehingga kalkulator yang dibuatnya cuma menampilkan hasil positif jika bernilai negatif maka program akan print “ERROR” serta cuma menampilkan bilangan bulat jika ada bilangan desimal maka dibulatkan ke bawah.
+
+e. Setelah diberi semangat, Max pun melanjutkan programnya dia ingin (pada child process) kalimat akan di print dengan contoh format : 
+  - perkalian	: “hasil perkalian tiga dan tujuh adalah dua puluh satu.”
+  - penjumlahan	: “hasil penjumlahan tiga dan tujuh adalah sepuluh.”
+  - pengurangan	: “hasil pengurangan tujuh dan tiga adalah empat.”
+  - pembagian	: “hasil pembagian tujuh dan tiga adalah dua.”
+
+f. Max ingin hasil dari setiap perhitungan dicatat dalam sebuah log yang diberi nama histori.log. Pada parent process, lakukan pembuatan file log berdasarkan data yang dikirim dari child process. 
+  - Format: [date] [type] [message]
+  - Type: KALI, TAMBAH, KURANG, BAGI
+  - Ex:
+    [10/03/24 00:29:47] [KALI] tujuh kali enam sama dengan empat puluh dua.
+    
+    [10/03/24 00:30:00] [TAMBAH] sembilan tambah sepuluh sama dengan sembilan belas.
+    
+    [10/03/24 00:30:12] [KURANG] ERROR pada pengurangan.
+
+
+### Kode Penyelesaian
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <math.h>
+#include <time.h>
+
+// convert number string to integer
+int string_to_number(char *str) {
+    if (strcmp(str, "nol") == 0) return 0;
+    if (strcmp(str, "satu") == 0) return 1;
+    if (strcmp(str, "dua") == 0) return 2;
+    if (strcmp(str, "tiga") == 0) return 3;
+    if (strcmp(str, "empat") == 0) return 4;
+    if (strcmp(str, "lima") == 0) return 5;
+    if (strcmp(str, "enam") == 0) return 6;
+    if (strcmp(str, "tujuh") == 0) return 7;
+    if (strcmp(str, "delapan") == 0) return 8;
+    if (strcmp(str, "sembilan") == 0) return 9;
+    if (strcmp(str, "sepuluh") == 0) return 10;
+    if (strcmp(str, "seratus") == 0) return 100;
+    return -1; // If not a valid number string
+}
+
+// convert number to words
+void number_to_words(int num, char *result) {
+    char *ones[] = {"nol", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh"};
+    char *teens[] = {"sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas", "enam belas", "tujuh belas", "delapan belas", "sembilan belas"};
+    char *tens[] = {"", "sepuluh", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"};
+
+    if (num == 100) {
+        strcpy(result, "seratus");
+    } else if (num >= 0 && num <= 10) {
+        strcpy(result, ones[num]);
+    } else if (num >= 11 && num <= 19) {
+        strcpy(result, teens[num - 10]);
+    } else if (num >= 20 && num <= 99) {
+        if (num % 10 == 0) {
+            strcpy(result, tens[num / 10]);
+        } else {
+            sprintf(result, "%s %s", tens[num / 10], ones[num % 10]);
+        }
+    }
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <operation>\n", argv[0]);
+        return 1;
+    }
+
+    // Pipe for communication between parent and child process
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        perror("pipe");
+        return 1;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) { // Child process
+        close(pipefd[1]); // Close unused write end
+        int result;
+        read(pipefd[0], &result, sizeof(result));
+
+        char result_words[50];
+        number_to_words(result, result_words);
+
+        char operation[20];
+        char input1[10], input2[10];
+        if (strcmp(argv[1], "-kali") == 0) {
+            strcpy(operation, "perkalian");
+            read(pipefd[0], input1, sizeof(input1));
+            read(pipefd[0], input2, sizeof(input2));
+            printf("hasil %s %s dan %s adalah %s.\n", operation, input1, input2, result_words);
+        } else if (strcmp(argv[1], "-tambah") == 0) {
+            strcpy(operation, "penjumlahan");
+            read(pipefd[0], input1, sizeof(input1));
+            read(pipefd[0], input2, sizeof(input2));
+            printf("hasil %s %s dan %s adalah %s.\n", operation, input1, input2, result_words);
+        } else if (strcmp(argv[1], "-kurang") == 0) {
+            strcpy(operation, "pengurangan");
+            read(pipefd[0], input1, sizeof(input1));
+            read(pipefd[0], input2, sizeof(input2));
+            if (result < 0) {
+                printf("ERROR pada pengurangan\n");
+            } else if (result == 0) { // Added condition to handle zero result
+                printf("hasil pengurangan %s dan %s adalah %s.\n", input1, input2, result_words);
+            } else {
+                printf("hasil %s %s dan %s adalah %s.\n", operation, input1, input2, result_words);
+            }
+        } else if (strcmp(argv[1], "-bagi") == 0) {
+            strcpy(operation, "pembagian");
+            read(pipefd[0], input1, sizeof(input1));
+            read(pipefd[0], input2, sizeof(input2));
+            if (result == -1) {
+                printf("ERROR pada pembagian nol\n");
+            } else {
+                printf("hasil %s %s dan %s adalah %s.\n", operation, input1, input2, result_words);
+            }
+        }
+
+        // Logging
+        time_t rawtime;
+        struct tm *timeinfo;
+        char log_message[200];
+        char operation_str[20];
+        char time_str[20];
+
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+        strftime(time_str, sizeof(time_str), "%d/%m/%y %H:%M:%S", timeinfo);
+
+        if (strcmp(argv[1], "-kali") == 0) {
+            strcpy(operation_str, "KALI");
+            snprintf(log_message, sizeof(log_message), "[%s] [%s] %s kali %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+        } else if (strcmp(argv[1], "-tambah") == 0) {
+            strcpy(operation_str, "TAMBAH");
+            snprintf(log_message, sizeof(log_message), "[%s] [%s] %s tambah %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+        } else if (strcmp(argv[1], "-kurang") == 0) {
+            strcpy(operation_str, "KURANG");
+            if (result < 0) {
+                snprintf(log_message, sizeof(log_message), "[%s] [%s] ERROR pada pengurangan", time_str, operation_str);
+            } else if (result == 0) { // Added condition to handle zero result
+                snprintf(log_message, sizeof(log_message), "[%s] [%s] %s kurang %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+            } else {
+                snprintf(log_message, sizeof(log_message), "[%s] [%s] %s kurang %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+            }
+        } else if (strcmp(argv[1], "-bagi") == 0) {
+            strcpy(operation_str, "BAGI");
+            if (result == -1) {
+                snprintf(log_message, sizeof(log_message), "[%s] [%s] ERROR pada pembagian nol", time_str, operation_str);
+	} else {
+		snprintf(log_message, sizeof(log_message), "[%s] [%s] %s bagi %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+	}
+   }
+   
+ FILE *log_file = fopen("histori.log", "a");
+    if (log_file == NULL) {
+        perror("fopen");
+        return 1;
+    }
+
+    fprintf(log_file, "%s\n", log_message);
+    fclose(log_file);
+
+    close(pipefd[0]);
+} else { // Parent process
+    close(pipefd[0]); // Close unused read end
+
+    char input1[10], input2[10];
+    printf("Masukkan dua angka (dalam bahasa): ");
+    scanf("%s %s", input1, input2);
+
+    int num1 = string_to_number(input1);
+    int num2 = string_to_number(input2);
+
+    if (num1 == -1 || num2 == -1) {
+        printf("Input tidak valid.\n");
+        close(pipefd[1]);
+        return 1;
+    }
+
+    int result;
+    if (strcmp(argv[1], "-kali") == 0) result = num1 * num2;
+    else if (strcmp(argv[1], "-tambah") == 0) result = num1 + num2;
+    else if (strcmp(argv[1], "-kurang") == 0) result = num1 - num2;
+    else if (strcmp(argv[1], "-bagi") == 0) {
+        if (num2 == 0) {
+            result = -1; // Flag for division by zero
+        } else {
+            result = floor(num1 / num2);
+        }
+    }
+
+    write(pipefd[1], &result, sizeof(result));
+    write(pipefd[1], input1, sizeof(input1)); // Send input1
+    write(pipefd[1], input2, sizeof(input2)); // Send input2
+
+    close(pipefd[1]);
+    wait(NULL); // Wait for child process to complete
+}
+
+return 0;
+}
+
+```
+---
+
+### Penjelesan
+
+---
+
+1. Fungsi ```string_to_number```:
+	  ```c
+	int string_to_number(char *str) {
+	    if (strcmp(str, "nol") == 0) return 0;
+	    if (strcmp(str, "satu") == 0) return 1;
+	    if (strcmp(str, "dua") == 0) return 2;
+	    if (strcmp(str, "tiga") == 0) return 3;
+	    if (strcmp(str, "empat") == 0) return 4;
+	    if (strcmp(str, "lima") == 0) return 5;
+	    if (strcmp(str, "enam") == 0) return 6;
+	    if (strcmp(str, "tujuh") == 0) return 7;
+	    if (strcmp(str, "delapan") == 0) return 8;
+	    if (strcmp(str, "sembilan") == 0) return 9;
+	    if (strcmp(str, "sepuluh") == 0) return 10;
+	    if (strcmp(str, "seratus") == 0) return 100;
+	    return -1; // If not a valid number string
+	}
+	
+	```
+	Fungsi ```string_to_number``` digunakan untuk mengonversi string yang berisi angka dalam bentuk kata-kata menjadi nilai integer. Misalnya, "satu" akan dikonversi menjadi 1, "dua" menjadi 2, dan seterusnya. Fungsi menggunakan ```strcmp``` untuk membandingkan string input dengan daftar kata-kata angka yang mungkin. Jika string tidak sesuai dengan kata-kata angka yang valid, fungsi akan mengembalikan nilai -1 sebagai penanda kesalahan.
+
+2. Fungsi ```number_to_words```:
+	  ```c
+	void number_to_words(int num, char *result) {
+	    char *ones[] = {"nol", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh"};
+	    char *teens[] = {"sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas", "enam belas", "tujuh belas", "delapan belas", "sembilan belas"};
+	    char *tens[] = {"", "sepuluh", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"};
+	
+	    if (num == 100) {
+	        strcpy(result, "seratus");
+	    } else if (num >= 0 && num <= 10) {
+	        strcpy(result, ones[num]);
+	    } else if (num >= 11 && num <= 19) {
+	        strcpy(result, teens[num - 10]);
+	    } else if (num >= 20 && num <= 99) {
+	        if (num % 10 == 0) {
+	            strcpy(result, tens[num / 10]);
+	        } else {
+	            sprintf(result, "%s %s", tens[num / 10], ones[num % 10]);
+	        }
+	    }
+	}
+	```
+	Fungsi ```number_to_words``` melakukan kebalikan dari string_to_number. Ini mengonversi nilai integer menjadi kata-kata angka. Fungsi ini mengambil angka integer dan menyimpan representasinya dalam bentuk string di parameter result. Untuk angka-angka tertentu seperti 11 hingga 19, angka tersebut akan diubah menjadi kata-kata khusus seperti "sebelas", "dua belas", dan seterusnya.
+
+3. Fungsi ```main```:
+	  ```c
+	void processFile(const char *filePath) {
+	    char buffer[MAX_BUFFER_SIZE];
+	    FILE *file = fopen(filePath, "r+");
+	    if (file == NULL) {
+	        syslog(LOG_ERR, "Error opening file: %s", filePath);
+	        return;
+	    }
+	
+	    char *suspiciousStrings[] = {"m4LwAr3", "5pYw4R3", "R4nS0mWaR3"};
+	    char *replacementStrings[] = {"[MALWARE]", "[SPYWARE]", "[RANSOMWARE]"};
+	
+	    while (fgets(buffer, sizeof(buffer), file)) {
+	        for (int i = 0; i < sizeof(suspiciousStrings) / sizeof(suspiciousStrings[0]); ++i) {
+	            replaceSubstring(buffer, suspiciousStrings[i], replacementStrings[i]);
+	            if (strstr(buffer, replacementStrings[i]) != NULL) {
+	                writeLogEntry(filePath);
+	            }
+	        }
+	        fseek(file, -strlen(buffer), SEEK_CUR);
+	        fputs(buffer, file);
+	    }
+	    fclose(file);
+	}
+	```
+	
+	Fungsi ```main``` adalah fungsi utama dari program ini. Fungsi ini terdiri dari beberapa bagian yaitu Child Process, Parent Process, dan Logging. Fungsi ```main``` memeriksa jumlah argumen yang diberikan pada baris perintah. Jika tidak sesuai dengan yang diharapkan, program akan memberikan pesan tentang cara menggunakan program dan kemudian keluar.
+
+4. Child Process 
+	  ```c
+	if (pid == 0) { 
+	    close(pipefd[1]); 
+	    int result;
+	    read(pipefd[0], &result, sizeof(result));
+	
+	    char result_words[50];
+	    number_to_words(result, result_words);
+	
+	    char operation[20];
+	    char input1[10], input2[10];
+	    if (strcmp(argv[1], "-kali") == 0) {
+	        // Code for multiplication operation
+	    } else if (strcmp(argv[1], "-tambah") == 0) {
+	        // Code for addition operation
+	    } else if (strcmp(argv[1], "-kurang") == 0) {
+	        // Code for subtraction operation
+	    } else if (strcmp(argv[1], "-bagi") == 0) {
+	        // Code for division operation
+	    }
+	}
+	
+	```
+	Dalam child process setelah pemanggilan fork(), program menciptakan sebuah duplikat dari proses induk, memungkinkannya untuk memiliki salinan semua sumber daya, termasuk kode program dan ruang alamat. Child process bertanggung jawab untuk melakukan operasi matematika berdasarkan argumen baris perintah. Setelah menutup ujung tulis pipa, child process membaca hasil operasi matematika dari proses induk melalui pipa, mengonversi hasilnya menjadi kata-kata, dan membaca input angka dari pipa. Sesuai dengan jenis operasi yang diberikan, proses anak mencetak hasil operasi matematika dengan pesan yang sesuai, seperti "hasil perkalian [input1] dan [input2] adalah [hasil]", dan akhirnya mencatat operasi ke dalam file log "histori.log" bersama dengan timestamp.
+
+5. Logging
+   ```c
+	// Logging
+	time_t rawtime;
+	struct tm *timeinfo;
+	char log_message[200];
+	char operation_str[20];
+	char time_str[20];
+	
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(time_str, sizeof(time_str), "%d/%m/%y %H:%M:%S", timeinfo);
+	
+	// Membuat pesan log berdasarkan jenis operasi
+	if (strcmp(argv[1], "-kali") == 0) {
+	    strcpy(operation_str, "KALI");
+	    snprintf(log_message, sizeof(log_message), "[%s] [%s] %s kali %s sama dengan %s", time_str, operation_str, input1, input2, result_words);
+	} else if (strcmp(argv[1], "-tambah") == 0) {
+	    // Code for addition operation
+	} else if (strcmp(argv[1], "-kurang") == 0) {
+	    // Code for subtraction operation
+	} else if (strcmp(argv[1], "-bagi") == 0) {
+	    // Code for division operation
+	}
+	
+	// Membuka file log
+	FILE *log_file = fopen("histori.log", "a");
+	if (log_file == NULL) {
+	    perror("fopen");
+	    return 1;
+	}
+	
+	// Menulis pesan log ke file
+	fprintf(log_file, "%s\n", log_message);
+	
+	// Menutup file log
+	fclose(log_file);
+	
+	
+	  ```
+	Proses logging dalam program bertujuan untuk mencatat setiap operasi matematika ke dalam file log "histori.log". Sebelumnya, program membuat pesan log yang mencakup waktu operasi, jenis operasi, serta input dan outputnya. Pesan tersebut kemudian ditambahkan ke file log, dan setelah selesai, file log ditutup. Proses ini memungkinkan program untuk melacak aktivitasnya dan melakukan analisis lebih lanjut jika diperlukan.
+
+6. Parent Process 
+	  ```c
+	else { // Parent process
+    close(pipefd[0]); // Close unused read end
+
+    char input1[10], input2[10];
+    printf("Masukkan dua angka (dalam bahasa): ");
+    scanf("%s %s", input1, input2);
+
+    int num1 = string_to_number(input1);
+    int num2 = string_to_number(input2);
+
+    if (num1 == -1 || num2 == -1) {
+        printf("Input tidak valid.\n");
+        close(pipefd[1]);
+        return 1;
+    }
+
+    int result;
+    if (strcmp(argv[1], "-kali") == 0) result = num1 * num2;
+    else if (strcmp(argv[1], "-tambah") == 0) result = num1 + num2;
+    else if (strcmp(argv[1], "-kurang") == 0) result = num1 - num2;
+    else if (strcmp(argv[1], "-bagi") == 0) {
+        // Code for division operation
+    }
+
+    write(pipefd[1], &result, sizeof(result));
+    write(pipefd[1], input1, sizeof(input1)); // Send input1
+    write(pipefd[1], input2, sizeof(input2)); // Send input2
+
+    close(pipefd[1]);
+    wait(NULL); // Wait for child process to complete
+   }
+   ```
+
+	Proses induk bertanggung jawab untuk meminta pengguna memasukkan dua angka dalam bahasa, yang kemudian dikonversi menjadi angka menggunakan fungsi string_to_number. Proses ini juga menangani kondisi error seperti input yang tidak valid, mencetak pesan kesalahan jika diperlukan, dan menulis angka-angka tersebut ke pipa untuk proses anak menggunakan fungsi write. Setelah itu, proses induk menunggu proses anak menyelesaikan tugasnya menggunakan wait(), memastikan bahwa proses induk menunggu hingga proses anak selesai sebelum melanjutkan eksekusi. Setelah menerima hasil dari proses anak, proses induk menutup ujung tulis pipa karena tidak akan lagi mengirim data ke proses anak, dan kemudian menutup pipa setelah selesai digunakan.
+
+### Revisi
+
+- Tambahkan fungsi string ke integer pada parent process
+  ```c
+   } else { // Parent process
+        close(pipefd[0]); // Close unused read end
+
+        char input1[10], input2[10];
+        printf("Masukkan dua angka (dalam bahasa): ");
+        scanf("%s %s", input1, input2);
+
+        int num1 = string_to_number(input1);
+        int num2 = string_to_number(input2);
+
+        if (num1 == -1 || num2 == -1) {
+            printf("Input tidak valid.\n");
+            close(pipefd[1]);
+            return 1;
+        }
+
+        // Integer to string conversion
+        char num1_str[10], num2_str[10];
+        sprintf(num1_str, "%d", num1);
+        sprintf(num2_str, "%d", num2);
+
+        int result;
+        if (strcmp(argv[1], "-kali") == 0) result = num1 * num2;
+        else if (strcmp(argv[1], "-tambah") == 0) result = num1 + num2;
+        else if (strcmp(argv[1], "-kurang") == 0) result = num1 - num2;
+        else if (strcmp(argv[1], "-bagi") == 0) {
+            if (num2 == 0) {
+                result = -1; // Flag for division by zero
+            } else {
+                result = floor(num1 / num2);
+            }
+        }
+
+        // Output in numeric form
+        printf("Hasil dalam bentuk angka: %d\n", result);
+
+        write(pipefd[1], &result, sizeof(result));
+        write(pipefd[1], num1_str, sizeof(num1_str)); // Send num1_str
+        write(pipefd[1], num2_str, sizeof(num2_str)); // Send num2_str
+
+        close(pipefd[1]);
+        wait(NULL); // Wait for child process to complete
+    }
+
+    return 0;
+  }
+  
+  ```
+  
+### Dokumentasi
+
+
+
 ## Soal 3
 
 Dikerjakan oleh Muhammad Dzaky Ahnaf (5027231039)
