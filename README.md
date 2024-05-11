@@ -92,7 +92,7 @@ int main() {
     }
     
     struct dirent *entry;
-		int shm_key = 12345678;
+    int shm_key = 12345678;
     ...
 ```
 
