@@ -788,7 +788,7 @@ int main(int argc, char *argv[]) {
 
 Pada soal ini, kita membuat sebuah sistem client dan server. Client hanya terdiri dari program ```driver.c``` sedangkan pada sisi Server terdapat ```actions.c```, ```paddock.c```. Nah, disini kita menggunakan socket untuk menghubungkan antara client dan server agar dapat berkomunkasi. Lalu ```actions.c``` disini hanya berisi function syarat-syarat yang menentukan output yang akan dicatat pada ```race.log``` dan bisa di call oleh ```paddock.c```
 
-- driver.c
+#### driver.c
 1. Mendeklarasi library dan konstanta
 ```c
 #include <stdio.h>
@@ -886,6 +886,149 @@ return 0;
 Terakhir, program menutup socket klien menggunakan fungsi ```close``` dan mengembalikan nilai ```0``` untuk mengindikasikan keberhasilan eksekusi program.
 
 Jadi Secara keseluruhan, program ini adalah sebuah klien sederhana yang terhubung dengan server paddock melalui socket TCP/IP. Klien akan mengirimkan perintah dan informasi yang diberikan sebagai argumen baris perintah, dan kemudian menerima tanggapan dari server paddock. Tanggapan tersebut akan ditampilkan pada konsol.
+
+#### paddock.c
+
+1. Fungsi Log Communication
+```c
+void log_communication(const char* source, const char* command, const char* additional_info) {
+    FILE *log_file = fopen(LOG_FILE, "a");
+    if (log_file == NULL) {
+        perror("Failed to open log file");
+        return;
+    }
+
+    time_t now = time(NULL);
+    struct tm *local_time = localtime(&now);
+    char time_str[20];
+    strftime(time_str, sizeof(time_str), "%d/%m/%Y %H:%M:%S", local_time);
+
+    fprintf(log_file, "[%s] [%s]: [%s] [%s]\n", source, time_str, command, additional_info);
+    fclose(log_file);
+}
+```
+
+- Fungsi ini digunakan untuk mencatat komunikasi antara klien dan server ke dalam file log.
+- Fungsi menerima tiga parameter: ```source``` (sumber komunikasi, misalnya "Driver" atau "Paddock"), ```command``` (perintah yang diterima), dan ```additional_info``` (informasi tambahan terkait perintah).
+- Fungsi membuka file log (```race.log```) dalam mode append.
+- Fungsi mendapatkan waktu saat ini menggunakan ```time``` dan ```localtime```, dan memformat waktu ke dalam string menggunakan ```strftime```.
+- Fungsi menulis log ke dalam file dengan format ```[Source] [Waktu]: [Command] [Additional_info]```.
+- Fungsi menutup file log setelah selesai.
+
+2. Fungsi 
+```c
+int main() {
+    int server_socket, client_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    char buffer[256];
+
+    // Membuat socket server
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1) {
+        perror("Failed to create server socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Menetapkan pengaturan alamat server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    // Mengikat socket server ke alamat dan port
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("Failed to bind server socket");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    // Mulai mendengarkan koneksi klien
+    if (listen(server_socket, 5) == -1) {
+        perror("Failed to listen on server socket");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Paddock server is running on port %d...\n", PORT);
+
+    // Terus menerima koneksi klien
+    while (1) {
+        // Menerima koneksi klien
+        client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
+        if (client_socket == -1) {
+            perror("Failed to accept client connection");
+            continue;
+        }
+
+        // Membaca permintaan dari klien
+        memset(buffer, 0, sizeof(buffer));
+        ssize_t bytes_read = read(client_socket, buffer, sizeof(buffer) - 1);
+        if (bytes_read == -1) {
+            perror("Failed to read client request");
+            close(client_socket);
+            continue;
+        }
+
+        buffer[bytes_read] = '\0';
+
+        // Log permintaan klien
+        log_communication("Driver", buffer, "");
+
+        // Parsing permintaan dan panggilan fungsi dari actions.c
+        char command[50];
+        char info[50];
+        const char* response = "Invalid command";
+
+        sscanf(buffer, "%s %s", command, info);
+
+        if (strcmp(command, "Gap") == 0) {
+            float gap = atof(info);
+            response = Gap(gap);
+        } else if (strcmp(command, "Fuel") == 0) {
+            float fuel = atof(info);
+            response = Fuel(fuel);
+        } else if (strcmp(command, "Tire") == 0) {
+            int tire = atoi(info);
+            response = Tire(tire);
+        } else if (strcmp(command, "TireChange") == 0) {
+            response = TireChange(info);
+        }
+
+        // Mengirim respons ke klien
+        write(client_socket, response, strlen(response));
+        write(client_socket, "\n", 1);
+
+        // Log tanggapan paddock
+        log_communication("Paddock", command, response);
+
+        // Menutup koneksi klien
+        close(client_socket);
+    }
+
+    // Menutup socket server
+    close(server_socket);
+    return 0;
+}
+```
+
+- Fungsi utama yang dijalankan ketika program server dieksekusi.
+- Membuat socket server menggunakan ```socket(AF_INET, SOCK_STREAM, 0)```.
+- Menetapkan alamat dan port server menggunakan ```struct sockaddr_in```.
+- Mengikat socket server ke alamat dan port yang telah ditetapkan menggunakan ```bind```.
+- Mendengarkan koneksi masuk dari klien menggunakan ```listen```.
+- Dalam loop utama, program:
+    - Menerima koneksi dari klien menggunakan ```accept```.
+    - Membaca permintaan dari klien menggunakan ```read```.
+    - Mencatat permintaan klien menggunakan fungsi ```log_communication```.
+    - Memisahkan perintah dan informasi dari permintaan klien menggunakan ```sscanf```.
+    - Memanggil fungsi yang sesuai (```Gap```, ```Fuel```, ```Tire```, atau ```TireChange```) dari ```actions```.c berdasarkan perintah yang diterima.
+    - Mengirimkan tanggapan kembali ke klien menggunakan ```write```.
+    - Mencatat tanggapan server menggunakan fungsi ```log_communication```.
+    - Menutup koneksi dengan klien menggunakan ```close```.
+
+- Setelah keluar dari loop utama, program menutup socket server menggunakan ```close```.
+
+Jadi Dalam program ini, fungsi ```log_communication``` digunakan untuk mencatat setiap komunikasi antara klien dan server ke dalam file log ```race.log```. Fungsi ```main``` adalah fungsi utama yang menjalankan server. Server akan mendengarkan koneksi dari klien pada port yang ditentukan (dalam kasus ini, port ```12345```). Ketika menerima permintaan dari klien, program akan memisahkan perintah dan informasi, memanggil fungsi yang sesuai dari ```actions.c``` untuk mendapatkan tanggapan, dan mengirimkan tanggapan kembali ke klien. Setiap permintaan dan tanggapan akan dicatat ke dalam file log menggunakan fungsi ```log_communication```.
 
 ### Dokumentasi Pengerjaan
 
