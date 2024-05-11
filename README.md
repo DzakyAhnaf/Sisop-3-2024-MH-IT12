@@ -881,6 +881,21 @@ return 0;
 Terakhir, program menutup socket klien menggunakan fungsi ```close``` dan mengembalikan nilai ```0``` untuk mengindikasikan keberhasilan eksekusi program.
 
 Jadi Secara keseluruhan, program ini adalah sebuah klien sederhana yang terhubung dengan server paddock melalui socket TCP/IP. Klien akan mengirimkan perintah dan informasi yang diberikan sebagai argumen baris perintah, dan kemudian menerima tanggapan dari server paddock. Tanggapan tersebut akan ditampilkan pada konsol.
+
+### Dokumentasi Pengerjaan
+
+1. Menjalankan program ```paddock.c``` terlebih dahulu 
+
+![image](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/110287409/ec5ea5c8-7f6d-431e-8582-dbe8ba8ace53)
+
+2. Memasukkan perintah yang diinginkan pada ```actions.c```
+
+![image](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/110287409/fbcdc0a2-5d10-42ef-98fd-ec9f70813ad6)
+
+3. Hasil ```race.log``` dari menjalankan perintah-perintah pada ```actions.c```
+
+![image](https://github.com/DzakyAhnaf/Sisop-3-2024-MH-IT12/assets/110287409/0671224a-d0a1-4e2c-8715-62e88c0f47f9)
+
 ## Soal 4
 
 Dikerjakan oleh Adlya Isriena Aftarisya (5027231066)
